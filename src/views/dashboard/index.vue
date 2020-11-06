@@ -25,22 +25,22 @@
         <el-button :type="config.startbtnType">{{config.label}}</el-button>
       </el-form-item>
     </el-form>
-    <div class="main-content" style="height: 100%;" id="mem">
+    <div class="main-content" style="height: 50%; width: auto" id="mem">
+      echart
+    </div>
+    <div class="main-content" style="height: 50%; width: auto" id="cpu">
       echart
     </div>
   </div>
 </template>
 
 <script>
-  // import { mapGetters } from 'vuex'
   import echarts from 'echarts'
+  import moment from 'moment'
 
   export default {
     name: 'Dashboard',
     computed: {
-      // ...mapGetters([
-      //   'name'
-      // ])
     },
     data() {
       return {
@@ -49,6 +49,7 @@
         data: [],
         date: [],
         echart: null,
+        echartA: null,
         config: {
           startbtnType: 'success',
           label: '开始'
@@ -84,24 +85,20 @@
             data: ['pss', 'native']
           },
           grid: {
-            bottom: '30%'
+            top: '10px'
+          },
+          toolbox: {
+            show: true,
+            right: '20%',
+            feature: {
+              saveAsImage: {}
+            }
           },
           dataZoom: [{
-            type: 'inside',
-            start: 0,
-            end: 10
-          }, {
-            start: 0,
-            end: 10,
-            handleIcon: 'M10.7,11.9v-1.3H9.3v1.3c-4.9,0.3-8.8,4.4-8.8,9.4c0,5,3.9,9.1,8.8,9.4v1.3h1.3v-1.3c4.9-0.3,8.8-4.4,8.8-9.4C19.5,16.3,15.6,12.2,10.7,11.9z M13.3,24.4H6.7V23h6.6V24.4z M13.3,19.6H6.7v-1.4h6.6V19.6z',
-            handleSize: '80%',
-            handleStyle: {
-              color: '#fff',
-              shadowBlur: 3,
-              shadowColor: 'rgba(0, 0, 0, 0.6)',
-              shadowOffsetX: 2,
-              shadowOffsetY: 2
-            }
+            type: 'slider',
+            show: true,
+            start: 50,
+            end: 100
           }],
           xAxis: {
             type: 'time',
@@ -122,6 +119,11 @@
               type: 'line',
               showSymbol: false,
               hoverAnimation: false,
+              markLine: {
+                data: [
+                  {type: 'average', name: '平均值'}
+                ]
+              },
               data: []
             },
             {
@@ -129,6 +131,74 @@
               type: 'line',
               showSymbol: false,
               hoverAnimation: false,
+              markLine: {
+                data: [
+                  {type: 'average', name: '平均值'}
+                ]
+              },
+              data: []
+            }
+          ]
+        },
+        optionA: {
+          tooltip: {
+            trigger: 'axis'
+          },
+          legend: {
+            data: ['cpu', 'native']
+          },
+          grid: {
+            top: '20px'
+          },
+          toolbox: {
+            show: true,
+            right: '20%',
+            feature: {
+              saveAsImage: {}
+            }
+          },
+          dataZoom: [{
+            type: 'slider',
+            show: true,
+            start: 50,
+            end: 100
+          }],
+          xAxis: {
+            type: 'time',
+            splitLine: {
+              show: false
+            },
+          },
+          yAxis: {
+            type: 'value',
+            boundaryGap: [0, '100%'],
+            splitLine: {
+              show: false
+            }
+          },
+          series: [
+            {
+              name: 'cpu',
+              type: 'line',
+              showSymbol: false,
+              hoverAnimation: false,
+              markLine: {
+                data: [
+                  {type: 'average', name: '平均值'}
+                ]
+              },
+              data: []
+            },
+            {
+              name: 'native',
+              type: 'line',
+              showSymbol: false,
+              hoverAnimation: false,
+              markLine: {
+                data: [
+                  {type: 'average', name: '平均值'}
+                ]
+              },
               data: []
             }
           ]
@@ -143,6 +213,12 @@
           this.echart = echarts.init(document.getElementById('mem'))
           this.echart.setOption(this.option)
         }
+        if (this.echartA){
+          this.echartA.setOption(this.optionA)
+        } else {
+          this.echartA = echarts.init(document.getElementById('cpu'))
+          this.echartA.setOption(this.optionA)
+        }
       },
       updateData() {
 
@@ -151,55 +227,54 @@
         return this.echart ? this.echart.resize() : ''
       },
       randomData() {
-        let now = +new Date('1907')
+        let now = (new Date()).toLocaleTimeString().replace(/^\D*/, '');
         let oneDay = 24 * 3600 * 1000;
         let value = Math.random() * 10000;
-        now = new Date();
+        now = moment(new Date()).format('YYYY-MM-DD HH:mm:ss');
         value = value + Math.random() * 21 - 10;
         this.data.push([
           {
-            value: [[now.getFullYear(), now.getMonth() + 1, now.getDate()].join('/')
-            + ' ' +
-            [now.getHours(), now.getMinutes(), now.getSeconds()].join(':'),
+            name: now.toString(),
+            value: [now,
               Math.round(value)]
           },
           {
-            value: [[now.getFullYear(), now.getMonth() + 1, now.getDate()].join('/')
-            + ' ' +
-            [now.getHours(), now.getMinutes(), now.getSeconds()].join(':'),
+            name: now.toString(),
+            value: [now,
               Math.round(value)* Math.random()]
-          }
+          },
         ]);
       },
       generateData(){
-          return new Promise(((resolve, reject) => {
-            if (this.data.length === 1000){
-              this.data.shift()
+        if (this.data.length === 1000){
+          this.data.shift()
+        }
+        this.randomData()
+        this.echart.setOption({
+          series: [
+            {
+              data: this.data.map(item => item[0])
+            },
+            {
+              data: this.data.map(item => item[1])
             }
-            this.randomData()
-
-            this.echart.setOption({
-              series:[
-                {
-                  data: this.data.map(item => item[0])
-                },
-                {
-                  data: this.data.map(item => item[1])
-                }
-              ]
-            })
-            resolve()
-          })).catch(error => reject(error))
+          ]
+        })
       }
     },
     created() {
-      let ws = new WebSocket('ws://127.0.0.1:8000/')
+      let ws = new WebSocket('ws://10.192.126.32:9570/')
 
       ws.onmessage = function (event) {
         console.log('event: ' + event)
       }
       ws.onopen = function (event) {
         console.log('event: ' + event)
+        ws.send('hello word!')
+      }
+
+      ws.onclose = function (event) {
+        ws.close()
       }
     },
     watch: {
@@ -228,8 +303,8 @@
     &-container {
       margin: 30px;
       position: absolute;
-      top: 10px;
-      bottom: 0;
+      top: 0;
+      bottom: 30px;
       left: 10px;
       width: 100%;
     }
