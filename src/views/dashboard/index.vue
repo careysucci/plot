@@ -2,7 +2,7 @@
   <div class="dashboard-container">
     <el-form :inline="true" :model="dataForm" class="demo-form-inline">
       <el-form-item label="设备">
-        <el-select v-model="deviceName" placeholder="请选择">
+        <el-select v-model="dataForm.deviceName" placeholder="请选择">
           <el-option
             v-for="item in dataForm.deviceList"
             :key="item.value"
@@ -12,7 +12,7 @@
         </el-select>
       </el-form-item>
       <el-form-item label="应用">
-        <el-select v-model="packageName" placeholder="请选择">
+        <el-select v-model="dataForm.packageName" placeholder="请选择">
           <el-option
             v-for="item in dataForm.appList"
             :key="item.value"
@@ -44,39 +44,23 @@
     },
     data() {
       return {
-        deviceName: '',
-        packageName: '',
         data: [],
         date: [],
+        ws: null,
         echart: null,
         echartA: null,
+        callback: [],
         config: {
           startbtnType: 'success',
           label: '开始'
         },
         dataForm: {
-          deviceList: [
-            {
-              label: 'D21b',
-              value: 'sdf1232'
-            },
-            {
-              label: 'E28',
-              value: '123de333'
-            }
-          ],
-          appList: [
-            {
-              label: '音乐',
-              value: 'com.xiaopeng.musicradio'
-            },
-            {
-              label: '收音机',
-              value: 'com.xiaopeng.dab'
-            }
-          ],
+          deviceList: [],
+          appList: [],
+          packageName: '',
+          deviceName: '',
+          ip: 'ws://10.192.126.32:9570/',
         },
-
         option: {
           tooltip: {
             trigger: 'axis'
@@ -260,21 +244,96 @@
             }
           ]
         })
+      },
+      initWebSocket(){
+        return new Promise((resolve, reject) => {
+          this.ws = new WebSocket(`ws://${this.dataForm.ip}/`)
+          resolve()
+        }).then(() => {
+          this.ws.onopen(event => {
+            console.log("connected.")
+            this.getDeviceInfo(data)
+          })
+
+          this.ws.onmessage(event => {
+            console.log('onmessage.')
+            const data = JSON.parse(event.data)
+            const method = this.callback.pop()
+            console.log(method)
+            method(data)
+          })
+          this.ws.onclose(event => {
+            this.ws.close()
+          })
+        }).catch(error => {
+          console.log(error)
+            if (this.ws){
+              this.ws.close()
+            }
+            reject(error)
+          })
+      },
+      initDeviceData(res){
+        let data = res.devs
+        if (data) {
+          data.forEach(item => {
+            this.dataForm.deviceList.push({
+              label: item,
+              value: item
+            })
+          })
+        }
+      },
+      getDeviceInfo(){
+        return new Promise((resolve, reject) => {
+          this.ws.send('getdevinfo')
+          this.callback.push(this.initDeviceData)
+          resolve()
+        }).catch(error => {
+          console.log(error)
+          reject(error)
+        })
+      },
+      initAppData(res){
+        let data = res[this.dataForm.deviceName]
+        if (data){
+          data.forEach(item => {
+            this.dataForm.appList.push({
+              label: item,
+              value: item
+            })
+          })
+        }
+      },
+      getAppList(){
+        return new Promise(((resolve, reject) => {
+          this.ws.send(`devselect_${this.dataForm.deviceName}`)
+          this.callback.push(this.initAppData)
+          resolve()
+        })).catch(error => {
+          reject(error)
+        })
       }
     },
     created() {
-      let ws = new WebSocket('ws://10.192.126.32:9570/')
+      this.ws = new WebSocket('ws://10.192.126.32:9570/')
 
-      ws.onmessage = function (event) {
-        console.log('event: ' + event)
-      }
-      ws.onopen = function (event) {
-        console.log('event: ' + event)
-        ws.send('hello word!')
+      this.ws.onmessage = event => {
+        const data = JSON.parse(event.data)
+        const method = this.callback.pop()
+        if (method instanceof Function && data){
+          console.log(data)
+          console.log(method)
+          method(data)
+        }
       }
 
-      ws.onclose = function (event) {
-        ws.close()
+      this.ws.onopen = event => {
+        this.getDeviceInfo()
+      }
+
+      this.ws.onclose = event => {
+        this.ws.close()
       }
     },
     watch: {
@@ -283,7 +342,14 @@
           // this.initChart()
         },
         deep: true
-      }
+      },
+      "dataForm.deviceName": {
+        handler: function () {
+          console.log("getAppList")
+          this.getAppList()
+        },
+        deep: true
+      },
     },
     mounted() {
       this.randomData()
